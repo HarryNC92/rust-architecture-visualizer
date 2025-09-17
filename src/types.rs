@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 /// Represents a module in the architecture
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +99,31 @@ impl ModuleType {
             ModuleType::Logging => "📝",
             ModuleType::Monitoring => "📈",
             ModuleType::Other(_) => "📦",
+        }
+    }
+
+    /// Human-friendly display name for the module type
+    pub fn display_name(&self) -> String {
+        match self {
+            ModuleType::Core => "Core".to_string(),
+            ModuleType::DataProcessing => "Data Processing".to_string(),
+            ModuleType::AI => "AI".to_string(),
+            ModuleType::Performance => "Performance".to_string(),
+            ModuleType::Validation => "Validation".to_string(),
+            ModuleType::Execution => "Execution".to_string(),
+            ModuleType::Integration => "Integration".to_string(),
+            ModuleType::API => "API".to_string(),
+            ModuleType::Processing => "Processing".to_string(),
+            ModuleType::Scaffold => "Scaffold".to_string(),
+            ModuleType::Testing => "Testing".to_string(),
+            ModuleType::Utilities => "Utilities".to_string(),
+            ModuleType::Configuration => "Configuration".to_string(),
+            ModuleType::Database => "Database".to_string(),
+            ModuleType::Network => "Network".to_string(),
+            ModuleType::Security => "Security".to_string(),
+            ModuleType::Logging => "Logging".to_string(),
+            ModuleType::Monitoring => "Monitoring".to_string(),
+            ModuleType::Other(label) => label.clone(),
         }
     }
 }
@@ -236,4 +261,4 @@ pub struct ArchitectureMetrics {
 pub use crate::config::project_config::VisualizationSettings;
 
 // Re-export Theme and LayoutType from config
-pub use crate::config::project_config::{Theme, LayoutType};
+pub use crate::config::project_config::{LayoutType, Theme};

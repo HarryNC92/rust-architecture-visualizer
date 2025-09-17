@@ -1,10 +1,10 @@
-use anyhow::Result;
-use std::collections::HashMap;
 use crate::{
-    types::{ArchitectureMap, ModuleType, NodeStatus, VisualizationSettings, Theme, LayoutType},
     config::ProjectConfig,
     scanner::ArchitectureScanner,
+    types::{ArchitectureMap, LayoutType, ModuleType, NodeStatus, Theme, VisualizationSettings},
 };
+use anyhow::Result;
+use serde_json::{json, Value};
 
 /// Main architecture visualizer that generates HTML and handles data
 pub struct ArchitectureVisualizer {
@@ -47,8 +47,15 @@ impl ArchitectureVisualizer {
     /// Generate HTML for the architecture visualization
     pub fn generate_html(&self, architecture: &ArchitectureMap) -> Result<String> {
         let settings = &self.config.visualization;
-        let project_name = self.config.project.name.as_deref().unwrap_or("Rust Project");
-        
+        let project_name = self
+            .config
+            .project
+            .name
+            .as_deref()
+            .unwrap_or("Rust Project");
+
+        let javascript = self.generate_javascript(architecture, settings)?;
+
         Ok(format!(
             r#"
 <!DOCTYPE html>
@@ -60,6 +67,7 @@ impl ArchitectureVisualizer {
     <style>
         {}
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/reactflow@11.7.4/dist/style.css">
 </head>
 <body>
     <div class="container">
@@ -107,13 +115,13 @@ impl ArchitectureVisualizer {
             </div>
         </div>
     </div>
-    
-    <script>
+
+    <script type="module">
         {}
     </script>
 </body>
 </html>
-        "#,
+            "#,
             project_name,
             self.generate_css(settings),
             self.generate_stats_html(architecture),
@@ -122,348 +130,94 @@ impl ArchitectureVisualizer {
             architecture.last_scan.format("%Y-%m-%d %H:%M:%S UTC"),
             architecture.total_modules,
             architecture.edges.len(),
-            self.generate_javascript()
+            javascript
         ))
     }
 
     /// Generate CSS styles
-    fn generate_css(&self, settings: &VisualizationSettings) -> String {
-        let theme = match settings.theme {
-            Theme::Dark => "dark",
-            Theme::Light => "light",
-            _ => "auto",
-        };
-        
-        format!(
-            r#"
-        :root {{
-            --primary-color: #667eea;
-            --secondary-color: #764ba2;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-            --info-color: #17a2b8;
-            --light-color: #f8f9fa;
-            --dark-color: #343a40;
-            --border-color: #dee2e6;
-            --shadow: 0 2px 10px rgba(0,0,0,0.1);
-            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
-        }}
-        
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            min-height: 100vh;
-            color: #333;
-        }}
-        
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            min-height: 100vh;
-            box-shadow: var(--shadow-lg);
-        }}
-        
-        .header {{
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 2rem;
-            text-align: center;
-        }}
-        
-        .header h1 {{
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-            font-weight: 300;
-        }}
-        
-        .header p {{
-            font-size: 1.1rem;
-            opacity: 0.9;
-            margin-bottom: 2rem;
-        }}
-        
-        .controls {{
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }}
-        
-        .btn {{
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }}
-        
-        .btn-primary {{
-            background: var(--primary-color);
-            color: white;
-        }}
-        
-        .btn-primary:hover {{
-            background: #5a6fd8;
-            transform: translateY(-2px);
-        }}
-        
-        .btn-secondary {{
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-        }}
-        
-        .btn-secondary:hover {{
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-2px);
-        }}
-        
-        .btn-close {{
-            background: var(--danger-color);
-            color: white;
-            padding: 0.5rem;
-            border-radius: 50%;
-            width: 2rem;
-            height: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }}
-        
-        .stats {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            padding: 2rem;
-            background: var(--light-color);
-        }}
-        
-        .stat-card {{
-            background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: transform 0.3s ease;
-        }}
-        
-        .stat-card:hover {{
-            transform: translateY(-5px);
-        }}
-        
-        .stat-number {{
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-            margin-bottom: 0.5rem;
-        }}
-        
-        .stat-label {{
-            color: #666;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }}
-        
-        .visualization-container {{
-            display: flex;
-            min-height: 600px;
-        }}
-        
-        .visualization-panel {{
-            flex: 1;
-            position: relative;
-            background: #f8f9fa;
-        }}
-        
-        .legend {{
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: white;
-            padding: 1rem;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-            z-index: 10;
-        }}
-        
-        .legend h4 {{
-            margin-bottom: 1rem;
-            color: #333;
-        }}
-        
-        .legend-item {{
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }}
-        
-        .legend-color {{
-            width: 1rem;
-            height: 1rem;
-            border-radius: 3px;
-        }}
-        
-        .architecture-canvas {{
-            width: 100%;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
-        }}
-        
-        .module-node {{
-            position: absolute;
-            background: white;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border-left: 4px solid var(--primary-color);
-            min-width: 200px;
-            max-width: 300px;
-        }}
-        
-        .module-node:hover {{
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }}
-        
-        .module-header {{
-            padding: 1rem;
-            background: linear-gradient(135deg, var(--primary-color) 0%, #5a6fd8 100%);
-            color: white;
-            border-radius: 10px 10px 0 0;
-        }}
-        
-        .module-title {{
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }}
-        
-        .module-type {{
-            font-size: 0.8rem;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }}
-        
-        .module-body {{
-            padding: 1rem;
-        }}
-        
-        .module-metrics {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }}
-        
-        .metric {{
-            text-align: center;
-            padding: 0.5rem;
-            background: var(--light-color);
-            border-radius: 5px;
-        }}
-        
-        .metric-value {{
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: #333;
-        }}
-        
-        .metric-label {{
-            font-size: 0.7rem;
-            color: #666;
-            margin-top: 0.25rem;
-        }}
-        
-        .dependency-arrow {{
-            position: absolute;
-            pointer-events: none;
-            z-index: 1;
-        }}
-        
-        .details-panel {{
-            width: 350px;
-            background: white;
-            border-left: 1px solid var(--border-color);
-            display: none;
-            flex-direction: column;
-        }}
-        
-        .details-panel.open {{
-            display: flex;
-        }}
-        
-        .details-header {{
-            padding: 1rem;
-            background: var(--light-color);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-        
-        .details-content {{
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-        }}
-        
-        .footer {{
-            background: var(--light-color);
-            padding: 1rem 2rem;
-            border-top: 1px solid var(--border-color);
-        }}
-        
-        .info {{
-            display: flex;
-            gap: 2rem;
-            font-size: 0.9rem;
-            color: #666;
-        }}
-        
-        @media (max-width: 768px) {{
-            .visualization-container {{
-                flex-direction: column;
-            }}
-            
-            .details-panel {{
-                width: 100%;
-                height: 300px;
-            }}
-            
-            .controls {{
-                flex-direction: column;
-                align-items: center;
-            }}
-        }}
-        "#
+    fn generate_css(&self, _settings: &VisualizationSettings) -> String {
+        String::from(
+            r#":root{--primary:#667eea;--danger:#ef4444;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;background:#f4f5ff;color:#1f2937;padding:2rem;}
+body.theme-dark{background:#0f172a;color:#e2e8f0;}
+.container{max-width:1320px;margin:0 auto;background:#fff;border-radius:20px;box-shadow:0 12px 26px rgba(15,23,42,.12);overflow:hidden;}
+body.theme-dark .container{background:#111827;}
+.header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;text-align:center;padding:2.2rem 2rem;}
+.header h1{font-size:2.4rem;margin-bottom:.6rem;}
+.header p{opacity:.85;margin-bottom:2rem;}
+.controls{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;}
+.btn{padding:.8rem 1.5rem;border:none;border-radius:999px;font-weight:600;display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;}
+.btn-primary{background:linear-gradient(135deg,#667eea,#5a67d8);color:#fff;}
+.btn-secondary{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;}
+body.theme-dark .btn-secondary{background:rgba(30,41,59,.7);border-color:rgba(148,163,184,.4);color:#e2e8f0;}
+.btn-close{background:var(--danger);color:#fff;width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.4rem;padding:1.8rem;background:rgba(248,250,252,.9);}
+body.theme-dark .stats{background:rgba(15,23,42,.72);}
+.stat-card{background:#fff;border-radius:16px;padding:1.4rem;text-align:center;box-shadow:0 10px 24px rgba(15,23,42,.12);}
+body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
+.stat-number{font-size:2.2rem;font-weight:700;color:#667eea;}
+.stat-label{text-transform:uppercase;font-size:.78rem;letter-spacing:.08em;color:#64748b;}
+.visualization-container{display:grid;grid-template-columns:minmax(0,1fr)320px;min-height:600px;}
+@media(max-width:1000px){.visualization-container{grid-template-columns:1fr;}}
+.visualization-panel{position:relative;padding:1.5rem;background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(118,75,162,.08));}
+.legend{position:absolute;top:1.3rem;right:1.3rem;background:#fff;border-radius:12px;padding:1rem 1.1rem;box-shadow:0 12px 24px rgba(15,23,42,.12);z-index:10;}
+.legend h4{text-transform:uppercase;font-size:.8rem;letter-spacing:.08em;margin-bottom:.55rem;}
+.legend-item{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;color:#475569;}
+.legend-item:last-child{margin-bottom:0;}
+.legend-color{width:.8rem;height:.8rem;border-radius:4px;}
+.architecture-canvas{position:relative;height:660px;border-radius:18px;overflow:hidden;background:#fbfbff;border:1px solid rgba(148,163,184,.25);box-shadow:0 14px 28px rgba(15,23,42,.12);}
+#react-flow-root{width:100%;height:100%;}
+.react-flow__attribution{display:none!important;}
+.react-flow__pane{cursor:grab;}
+.react-flow__pane.dragging{cursor:grabbing;}
+.react-flow__node-module{width:210px;border-radius:16px;border:2px solid rgba(102,126,234,.25);background:#fff;box-shadow:0 10px 22px rgba(15,23,42,.12);transition:transform .2s ease,opacity .2s ease;}
+.react-flow__node-module.is-selected{transform:translateY(-3px);border-color:#667eea;}
+.react-flow__node-module.is-dimmed{opacity:.35;}
+.rf-module-card{padding:.9rem 1rem;display:flex;flex-direction:column;gap:.75rem;}
+.rf-module-card__header{display:flex;align-items:center;gap:.65rem;border-bottom:1px solid rgba(15,23,42,.1);padding-bottom:.4rem;}
+.rf-module-card__icon{font-size:1.45rem;}
+.rf-module-card__name{font-weight:600;font-size:1rem;color:#1f2937;}
+.rf-module-card__type{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;}
+.rf-module-card__metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;}
+.rf-metric{padding:.6rem;border-radius:10px;background:rgba(102,126,234,.12);text-align:center;}
+.rf-metric__value{font-weight:600;color:#1f2937;}
+.rf-metric__label{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:#64748b;}
+.empty-architecture{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.8rem;color:#475569;}
+.details-panel{background:#fff;border-left:1px solid rgba(148,163,184,.25);display:none;flex-direction:column;padding:1.2rem;gap:.95rem;}
+.details-panel.open{display:flex;}
+.details-header{display:flex;justify-content:space-between;align-items:center;}
+.details-content{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:.9rem;}
+.details-section h4{text-transform:uppercase;font-size:.76rem;letter-spacing:.08em;margin-bottom:.5rem;color:#1f2937;}
+.details-heading{display:flex;align-items:center;gap:.6rem;}
+.details-icon{font-size:1.7rem;}
+.details-title h3{font-size:1.2rem;margin:0;color:#0f172a;}
+.details-meta{font-size:.7rem;letter-spacing:.1em;color:#64748b;}
+.details-path{font-family:'Fira Code','Source Code Pro',monospace;font-size:.78rem;color:#475569;word-break:break-word;}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.65rem;}
+.metric-item{background:rgba(248,250,252,.95);border-radius:9px;padding:.65rem;display:flex;flex-direction:column;gap:.28rem;}
+.metric-item__label{text-transform:uppercase;font-size:.62rem;letter-spacing:.07em;color:#64748b;}
+.metric-item__value{font-weight:600;color:#1f2937;}
+.chip-row{display:flex;flex-wrap:wrap;gap:.4rem;}
+.chip{padding:.36rem .62rem;border-radius:999px;background:rgba(102,126,234,.16);color:#1f2937;font-size:.7rem;font-weight:600;}
+.empty-state{font-size:.82rem;color:#94a3b8;font-style:italic;}
+.details-list{list-style:none;display:flex;flex-direction:column;gap:.4rem;color:#475569;}
+.details-placeholder{color:#94a3b8;font-size:.85rem;}
+.footer{background:rgba(248,250,252,.95);padding:1rem 2rem;border-top:1px solid rgba(148,163,184,.28);}
+.info{display:flex;gap:1.3rem;flex-wrap:wrap;font-size:.84rem;color:#64748b;}
+@media(max-width:760px){body{padding:1rem;}.header h1{font-size:2rem;}.visualization-panel{padding:1.1rem;}.legend{position:relative;top:auto;right:auto;margin-bottom:1.1rem;}.architecture-canvas{height:520px;}.details-panel{width:100%;position:relative;}.controls{flex-direction:column;}}
+"#,
         )
     }
 
     /// Generate stats HTML
     fn generate_stats_html(&self, architecture: &ArchitectureMap) -> String {
-        let active_modules = architecture.nodes.values()
+        let active_modules = architecture
+            .nodes
+            .values()
             .filter(|n| matches!(n.status, NodeStatus::Active))
             .count();
-        
+
         format!(
             r#"
             <div class="stat-card">
@@ -542,178 +296,354 @@ impl ArchitectureVisualizer {
     }
 
     /// Generate architecture visualization HTML
-    fn generate_architecture_html(&self, architecture: &ArchitectureMap, settings: &VisualizationSettings) -> String {
-        // Generate SVG for dependencies
-        let svg = self.generate_dependency_svg(architecture);
-        
-        // Generate module nodes
-        let nodes = self.generate_module_nodes(architecture, settings);
-        
+    fn generate_architecture_html(
+        &self,
+        architecture: &ArchitectureMap,
+        _settings: &VisualizationSettings,
+    ) -> String {
         format!(
-            r#"
-            <div class="architecture-canvas">
-                {}
-                {}
-            </div>
-            "#,
-            svg,
-            nodes
+            r#"<div id="react-flow-root" data-node-count="{}"></div>"#,
+            architecture.nodes.len()
         )
     }
 
-    /// Generate dependency SVG
-    fn generate_dependency_svg(&self, architecture: &ArchitectureMap) -> String {
-        if architecture.edges.is_empty() {
-            return String::new();
+    fn build_react_flow_data(
+        &self,
+        architecture: &ArchitectureMap,
+        settings: &VisualizationSettings,
+    ) -> Value {
+        let mut ordered_nodes: Vec<_> = architecture.nodes.values().collect();
+        ordered_nodes.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let mut node_entries = Vec::new();
+        for (index, node) in ordered_nodes.iter().enumerate() {
+            let mut entry = json!({
+                "id": node.id,
+                "name": node.name,
+                "icon": node.module_type.icon(),
+                "moduleType": node.module_type.display_name(),
+                "color": node.module_type.color(),
+                "status": format!("{:?}", node.status),
+                "filePath": node.file_path,
+                "order": index,
+                "hierarchyLevel": node.dependencies.len(),
+                "dependencies": node.dependencies,
+                "dependents": node.dependents,
+                "metrics": {
+                    "lines_of_code": node.metrics.lines_of_code,
+                    "complexity_score": node.metrics.complexity_score,
+                    "test_coverage": node.metrics.test_coverage,
+                    "function_count": node.metrics.function_count,
+                    "struct_count": node.metrics.struct_count,
+                    "enum_count": node.metrics.enum_count,
+                    "trait_count": node.metrics.trait_count,
+                    "dependency_count": node.metrics.dependency_count,
+                    "dependent_count": node.metrics.dependent_count,
+                    "error_count": node.metrics.error_count,
+                    "warning_count": node.metrics.warning_count,
+                    "last_build_time": node.metrics.last_build_time.map(|time| time.to_rfc3339()),
+                },
+                "lastModified": node.last_modified.to_rfc3339(),
+            });
+
+            if let Some(position) = node.position.as_ref() {
+                if let Some(obj) = entry.as_object_mut() {
+                    obj.insert(
+                        "position".to_string(),
+                        json!({
+                            "x": position.x,
+                            "y": position.y,
+                        }),
+                    );
+                }
+            }
+
+            node_entries.push(entry);
         }
 
-        let mut svg_lines = Vec::new();
-        
-        for edge in &architecture.edges {
-            // This is a simplified version - in a real implementation,
-            // you'd calculate actual positions based on the layout algorithm
-            let from_pos = (100.0, 100.0); // Placeholder
-            let to_pos = (200.0, 200.0);   // Placeholder
-            
+        let mut edge_entries = Vec::new();
+        for (index, edge) in architecture.edges.iter().enumerate() {
             let color = if edge.is_circular {
-                "#dc3545" // Red for circular dependencies
+                "#ef4444"
             } else {
-                "#6c757d" // Gray for normal dependencies
+                "#94a3b8"
             };
-            
-            svg_lines.push(format!(
-                r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="2" opacity="0.6" marker-end="url(#arrowhead)"/>"#,
-                from_pos.0, from_pos.1, to_pos.0, to_pos.1, color
-            ));
+            edge_entries.push(json!({
+                "id": format!("edge-{}-{}-{}", edge.from, edge.to, index),
+                "source": edge.from,
+                "target": edge.to,
+                "type": "smoothstep",
+                "animated": edge.is_circular,
+                "label": format!("{:?}", edge.relationship),
+                "data": {
+                    "relationship": format!("{:?}", edge.relationship),
+                    "strength": edge.strength,
+                    "isCircular": edge.is_circular,
+                    "color": color,
+                },
+                "style": {
+                    "stroke": color,
+                    "strokeWidth": 1.6,
+                    "opacity": 0.85,
+                }
+            }));
         }
-        
-        format!(
-            r#"
-            <svg class="dependency-arrow" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;">
-                <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                        <polygon points="0 0, 10 3.5, 0 7" fill="{}" />
-                    </marker>
-                </defs>
-                {}
-            </svg>
-            "#,
-            "#6c757d", svg_lines.join("")
-        )
-    }
 
-    /// Generate module nodes
-    fn generate_module_nodes(&self, architecture: &ArchitectureMap, settings: &VisualizationSettings) -> String {
-        let mut nodes = Vec::new();
-        
-        for (i, node) in architecture.nodes.values().enumerate() {
-            let x = 50 + (i % 4) * 250;
-            let y = 100 + (i / 4) * 200;
-            
-            let color = node.module_type.color();
-            let icon = node.module_type.icon();
-            
-            nodes.push(format!(
-                r#"
-                <div class="module-node" style="left: {}px; top: {}px;" data-module-id="{}">
-                    <div class="module-header" style="border-left-color: {};">
-                        <div class="module-title">{} {}</div>
-                        <div class="module-type">{:?}</div>
-                    </div>
-                    <div class="module-body">
-                        <div class="module-metrics">
-                            <div class="metric">
-                                <div class="metric-value">{}</div>
-                                <div class="metric-label">Lines</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">{:.1}</div>
-                                <div class="metric-label">Complexity</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">{}</div>
-                                <div class="metric-label">Functions</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">{}</div>
-                                <div class="metric-label">Structs</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                "#,
-                x, y, node.id, color, icon, node.name, node.module_type,
-                node.metrics.lines_of_code, node.metrics.complexity_score,
-                node.metrics.function_count, node.metrics.struct_count
-            ));
-        }
-        
-        nodes.join("")
+        let theme = match &settings.theme {
+            Theme::Dark => "dark".to_string(),
+            Theme::Light => "light".to_string(),
+            Theme::Auto => "auto".to_string(),
+            Theme::Custom(value) => value.clone(),
+        };
+
+        json!({
+            "nodes": node_entries,
+            "edges": edge_entries,
+            "layout": settings.layout.to_string(),
+            "settings": {
+                "showMetrics": settings.show_metrics,
+                "showDependencies": settings.show_dependencies,
+                "theme": theme,
+            }
+        })
     }
 
     /// Generate JavaScript for interactivity
-    fn generate_javascript(&self) -> String {
-        r#"
-        // Module node click handler
-        document.addEventListener('click', function(e) {
-            const moduleNode = e.target.closest('.module-node');
-            if (moduleNode) {
-                const moduleId = moduleNode.dataset.moduleId;
-                showModuleDetails(moduleId);
-            }
+    fn generate_javascript(
+        &self,
+        architecture: &ArchitectureMap,
+        settings: &VisualizationSettings,
+    ) -> Result<String> {
+        let data = self.build_react_flow_data(architecture, settings);
+        let serialized = serde_json::to_string(&data)?;
+        let template = r#"
+import React from 'https://esm.sh/react@18.2.0';
+import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider } from 'https://esm.sh/reactflow@11.7.4';
+
+const architectureData = __ARCHITECTURE_DATA__;
+const nodesData = architectureData.nodes || [];
+const edgesData = architectureData.settings.showDependencies ? architectureData.edges : [];
+const nodeLookup = new Map(nodesData.map((node, index) => [node.id, { ...node, order: node.order ?? index }]));
+
+const layouts = ['grid', 'circular'];
+let layoutIndex = Math.max(layouts.indexOf((architectureData.layout || 'grid').toLowerCase()), 0);
+
+const detailsPanel = document.getElementById('details-panel');
+const detailsContent = document.getElementById('details-content');
+
+const escapeHtml = (value) => value === null || value === undefined ? '' : String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const formatNumber = (value, digits = 0) => value === null || value === undefined ? '—' : Number(value).toLocaleString(undefined, { maximumFractionDigits: digits });
+
+const computePositions = (layout) => {
+    const positions = new Map();
+    const total = nodesData.length || 1;
+    if (layout === 'circular' && total > 1) {
+        const radius = 220 + total * 12;
+        const cx = radius + 180;
+        const cy = radius * 0.55 + 150;
+        nodesData.forEach((node, index) => {
+            const angle = (Math.PI * 2 * index) / total;
+            positions.set(node.id, { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius * 0.7 });
         });
-        
-        // Close details panel
-        document.getElementById('close-details').addEventListener('click', function() {
-            document.getElementById('details-panel').classList.remove('open');
+    }
+    if (!positions.size) {
+        const columns = Math.ceil(Math.sqrt(total));
+        nodesData.forEach((node, index) => {
+            const column = index % columns;
+            const row = Math.floor(index / columns);
+            positions.set(node.id, { x: 160 + column * 240, y: 140 + row * 200 });
         });
-        
-        // Refresh button
-        document.getElementById('refresh-btn').addEventListener('click', function() {
-            location.reload();
-        });
-        
-        // Layout button
-        document.getElementById('layout-btn').addEventListener('click', function() {
-            // TODO: Implement layout switching
-            alert('Layout switching not implemented yet');
-        });
-        
-        // Theme button
-        document.getElementById('theme-btn').addEventListener('click', function() {
-            // TODO: Implement theme switching
-            alert('Theme switching not implemented yet');
-        });
-        
-        // Fullscreen button
-        document.getElementById('fullscreen-btn').addEventListener('click', function() {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                document.documentElement.requestFullscreen();
-            }
-        });
-        
-        function showModuleDetails(moduleId) {
-            const detailsPanel = document.getElementById('details-panel');
-            const detailsContent = document.getElementById('details-content');
-            
-            // TODO: Load actual module details
-            detailsContent.innerHTML = `
-                <h4>Module Details</h4>
-                <p>Module ID: ${moduleId}</p>
-                <p>Click on a module to see detailed information.</p>
-            `;
-            
-            detailsPanel.classList.add('open');
-        }
-        
-        // Auto-refresh if enabled
-        if (true) { // TODO: Check if auto-refresh is enabled
-            setInterval(function() {
-                // TODO: Implement auto-refresh
-            }, 30000);
-        }
-        "#.to_string()
+    }
+    return positions;
+};
+
+const buildNodes = (layout) => {
+    const positions = computePositions(layout);
+    return nodesData.map((node) => ({
+        id: node.id,
+        type: 'module',
+        position: positions.get(node.id) || { x: 0, y: 0 },
+        data: { ...node },
+        className: '',
+        sourcePosition: 'right',
+        targetPosition: 'left'
+    }));
+};
+
+const buildEdges = () => edgesData.map((edge) => ({
+    ...edge,
+    style: { ...(edge.style || {}) },
+    labelStyle: { fill: '#1f2937', fontSize: 11, fontWeight: 600 },
+    labelBgPadding: [6, 3],
+    labelBgBorderRadius: 6,
+    labelBgStyle: { fill: 'rgba(255,255,255,0.9)' }
+}));
+
+const renderDetails = (moduleId) => {
+    if (!detailsPanel || !detailsContent) return;
+    const data = nodeLookup.get(moduleId);
+    if (!data) return;
+    const metrics = data.metrics || {};
+    detailsPanel.classList.add('open');
+    detailsContent.innerHTML = `
+        <div class="details-heading">
+            <div class="details-icon">${escapeHtml(data.icon)}</div>
+            <div class="details-title">
+                <h3>${escapeHtml(data.name)}</h3>
+                <div class="details-meta">${escapeHtml(data.moduleType)} · ${escapeHtml(data.status)}</div>
+            </div>
+        </div>
+        <div class="details-section">
+            <h4>Summary</h4>
+            <p class="details-path">${escapeHtml(data.filePath)}</p>
+        </div>
+        <div class="details-section">
+            <h4>Metrics</h4>
+            <div class="metric-grid">
+                <div class="metric-item"><span class="metric-item__label">Lines</span><span class="metric-item__value">${formatNumber(metrics.lines_of_code)}</span></div>
+                <div class="metric-item"><span class="metric-item__label">Functions</span><span class="metric-item__value">${formatNumber(metrics.function_count)}</span></div>
+                <div class="metric-item"><span class="metric-item__label">Complexity</span><span class="metric-item__value">${formatNumber(metrics.complexity_score,1)}</span></div>
+                <div class="metric-item"><span class="metric-item__label">Deps</span><span class="metric-item__value">${formatNumber(metrics.dependency_count)}</span></div>
+            </div>
+        </div>
+        <div class="details-section">
+            <h4>Dependencies</h4>
+            <div class="chip-row">${(data.dependencies || []).map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') || '<span class="empty-state">None</span>'}</div>
+        </div>
+        <div class="details-section">
+            <h4>Dependents</h4>
+            <div class="chip-row">${(data.dependents || []).map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') || '<span class="empty-state">None</span>'}</div>
+        </div>
+    `;
+};
+
+const hideDetails = () => {
+    if (detailsPanel) detailsPanel.classList.remove('open');
+    if (detailsContent) detailsContent.innerHTML = '<p class="details-placeholder">Click on a module to see details</p>';
+};
+
+const layoutButton = document.getElementById('layout-btn');
+if (layoutButton) {
+    const updateLabel = () => {
+        const name = layouts[layoutIndex];
+        layoutButton.textContent = `📐 Layout (${name.charAt(0).toUpperCase() + name.slice(1)})`;
+    };
+    updateLabel();
+    layoutButton.addEventListener('click', () => {
+        layoutIndex = (layoutIndex + 1) % layouts.length;
+        updateLabel();
+        if (window.applyLayout) window.applyLayout(layouts[layoutIndex]);
+    });
+}
+
+const themeButton = document.getElementById('theme-btn');
+if ((architectureData.settings.theme || '').toLowerCase() === 'dark') {
+    document.body.classList.add('theme-dark');
+}
+if (themeButton) {
+    themeButton.addEventListener('click', () => {
+        document.body.classList.toggle('theme-dark');
+    });
+}
+
+const refreshButton = document.getElementById('refresh-btn');
+if (refreshButton) {
+    refreshButton.addEventListener('click', () => window.location.reload());
+}
+
+const closeButton = document.getElementById('close-details');
+if (closeButton) closeButton.addEventListener('click', hideDetails);
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hideDetails();
+});
+
+hideDetails();
+
+const e = React.createElement;
+
+const ModuleNode = ({ data }) => {
+    const metrics = data.metrics || {};
+    return e('div', { className: 'rf-module-card' },
+        e('div', { className: 'rf-module-card__header' },
+            e('div', { className: 'rf-module-card__icon' }, data.icon),
+            e('div', null,
+                e('div', { className: 'rf-module-card__name' }, data.name),
+                e('div', { className: 'rf-module-card__type' }, data.moduleType)
+            )
+        ),
+        architectureData.settings.showMetrics ? e('div', { className: 'rf-module-card__metrics' },
+            e('div', { className: 'rf-metric' },
+                e('div', { className: 'rf-metric__value' }, formatNumber(metrics.lines_of_code)),
+                e('div', { className: 'rf-metric__label' }, 'Lines')
+            ),
+            e('div', { className: 'rf-metric' },
+                e('div', { className: 'rf-metric__value' }, formatNumber(metrics.function_count)),
+                e('div', { className: 'rf-metric__label' }, 'Funcs')
+            ),
+            e('div', { className: 'rf-metric' },
+                e('div', { className: 'rf-metric__value' }, formatNumber(metrics.complexity_score,1)),
+                e('div', { className: 'rf-metric__label' }, 'Complexity')
+            ),
+            e('div', { className: 'rf-metric' },
+                e('div', { className: 'rf-metric__value' }, formatNumber(metrics.dependency_count)),
+                e('div', { className: 'rf-metric__label' }, 'Deps')
+            )
+        ) : null
+    );
+};
+
+const FlowApp = () => {
+    const [nodes, setNodes, onNodesChange] = useNodesState(buildNodes(layouts[layoutIndex]));
+    const [edges, setEdges, onEdgesChange] = useEdgesState(buildEdges());
+
+    React.useEffect(() => {
+        window.applyLayout = (layout) => {
+            const positions = computePositions(layout);
+            setNodes((current) => current.map((node) => ({ ...node, position: positions.get(node.id) || node.position })));
+        };
+        return () => { delete window.applyLayout; };
+    }, [setNodes]);
+
+    const onNodeClick = React.useCallback((_, node) => {
+        renderDetails(node.id);
+    }, []);
+
+    const onPaneClick = React.useCallback(() => {
+        hideDetails();
+    }, []);
+
+    if (!nodesData.length) {
+        return e('div', { className: 'empty-architecture' }, 'No modules found');
+    }
+
+    return e(ReactFlow, {
+        nodes,
+        edges,
+        nodeTypes: { module: ModuleNode },
+        onNodesChange,
+        onEdgesChange,
+        onNodeClick,
+        onPaneClick,
+        fitView: true,
+        defaultEdgeOptions: { type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20 } },
+        minZoom: 0.1,
+        maxZoom: 1.5,
+        proOptions: { hideAttribution: true }
+    },
+        e(Background, { gap: 32, size: 1, color: '#dce2f2' }),
+        e(MiniMap, { nodeColor: (node) => node?.data?.color || '#9ca3af' }),
+        e(Controls, null)
+    );
+};
+
+const rootElement = document.getElementById('react-flow-root');
+if (rootElement) {
+    const root = createRoot(rootElement);
+    root.render(e(ReactFlowProvider, null, e(FlowApp, null)));
+}
+"#;
+        Ok(template.replace("__ARCHITECTURE_DATA__", &serialized))
     }
 }
