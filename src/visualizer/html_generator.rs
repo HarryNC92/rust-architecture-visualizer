@@ -419,7 +419,7 @@ body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
         let template = r#"
 import * as React from 'https://esm.sh/react@18.2.0?dev';
 import * as ReactDOMClient from 'https://esm.sh/react-dom@18.2.0/client?dev';
-import ReactFlow, { Background, Controls, MiniMap, MarkerType, ReactFlowProvider, applyEdgeChanges, applyNodeChanges } from 'https://esm.sh/reactflow@11.7.4?deps=react@18.2.0,react-dom@18.2.0&dev';
+import ReactFlow, { Background, Controls, MiniMap, MarkerType, ReactFlowProvider, applyEdgeChanges, applyNodeChanges, Handle, Position } from 'https://esm.sh/reactflow@11.7.4?deps=react@18.2.0,react-dom@18.2.0&dev';
 
 const { createRoot } = ReactDOMClient;
 const globalObj = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : {});
@@ -479,9 +479,7 @@ const buildNodes = (layout, nodes) => {
         type: 'module',
         position: positions.get(node.id) || { x: 0, y: 0 },
         data: { ...node },
-        className: '',
-        sourcePosition: 'right',
-        targetPosition: 'left'
+        className: ''
     }));
 };
 
