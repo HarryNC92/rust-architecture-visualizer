@@ -39,41 +39,46 @@ impl SvgRenderer {
 
     /// Render SVG definitions (markers, gradients, etc.)
     fn render_definitions(&self) -> String {
+        const GRAY_COLOR: &str = "#6c757d";
+        const RED_COLOR: &str = "#dc3545";
+        const BLACK_COLOR: &str = "#000000";
+        
         format!(
             r#"
             <defs>
                 <!-- Arrow markers for dependencies -->
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d" />
+                    <polygon points="0 0, 10 3.5, 0 7" fill="{}" />
                 </marker>
                 
                 <!-- Arrow marker for circular dependencies -->
-                <marker id="circular-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#dc3545" />
+                <marker id="circular_arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="{}" />
                 </marker>
                 
                 <!-- Gradients for module types -->
-                <linearGradient id="core-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="core_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1" />
                     <stop offset="100%" style="stop-color:#c0392b;stop-opacity:1" />
                 </linearGradient>
                 
-                <linearGradient id="api-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="api_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" style="stop-color:#e67e22;stop-opacity:1" />
                     <stop offset="100%" style="stop-color:#d35400;stop-opacity:1" />
                 </linearGradient>
                 
-                <linearGradient id="data-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="data_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
                     <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1" />
                 </linearGradient>
                 
                 <!-- Drop shadow filter -->
                 <filter id="dropshadow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="{}" flood-opacity="0.3"/>
                 </filter>
             </defs>
-            "#
+            "#,
+            GRAY_COLOR, RED_COLOR, BLACK_COLOR
         )
     }
 

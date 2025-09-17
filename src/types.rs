@@ -232,51 +232,8 @@ pub struct ArchitectureMetrics {
     pub maintainability_index: f64,
 }
 
-/// Visualization settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VisualizationSettings {
-    pub theme: Theme,
-    pub layout: LayoutType,
-    pub show_metrics: bool,
-    pub show_dependencies: bool,
-    pub group_by_type: bool,
-    pub show_errors: bool,
-    pub show_warnings: bool,
-    pub filter_complexity: Option<f64>,
-    pub filter_type: Option<ModuleType>,
-}
+// Re-export VisualizationSettings from config
+pub use crate::config::project_config::VisualizationSettings;
 
-/// Available themes
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Theme {
-    Light,
-    Dark,
-    Auto,
-    Custom(String),
-}
-
-/// Layout types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LayoutType {
-    Grid,
-    ForceDirected,
-    Hierarchical,
-    Circular,
-    Custom(String),
-}
-
-impl Default for VisualizationSettings {
-    fn default() -> Self {
-        Self {
-            theme: Theme::Auto,
-            layout: LayoutType::ForceDirected,
-            show_metrics: true,
-            show_dependencies: true,
-            group_by_type: true,
-            show_errors: true,
-            show_warnings: true,
-            filter_complexity: None,
-            filter_type: None,
-        }
-    }
-}
+// Re-export Theme and LayoutType from config
+pub use crate::config::project_config::{Theme, LayoutType};

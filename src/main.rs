@@ -37,7 +37,7 @@ enum Commands {
     /// Start the web server for interactive visualization
     Serve {
         /// Port to run the server on
-        #[arg(short, long, default_value = "8080")]
+        #[arg(long, default_value = "8000")]
         port: u16,
         
         /// Host to bind to
@@ -60,7 +60,7 @@ enum Commands {
         project: PathBuf,
         
         /// Port to run the server on
-        #[arg(short, long, default_value = "8080")]
+        #[arg(long, default_value = "8000")]
         port: u16,
         
         /// Configuration file path
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
             };
             
             let scanner = ArchitectureScanner::new(&project, config);
-            let architecture = scanner.scan().await?;
+            let architecture = scanner.scan_async().await?;
             
             if let Some(output_path) = output {
                 std::fs::write(&output_path, serde_json::to_string_pretty(&architecture)?)?;
@@ -129,9 +129,8 @@ async fn main() -> anyhow::Result<()> {
             let visualizer = ArchitectureVisualizer::new(scanner);
             let server = WebServer::new(visualizer);
             
-            // Enable watch mode
-            server.watch_mode(true);
-            server.serve("127.0.0.1", port).await?;
+            // Enable watch mode and serve
+            server.watch_mode(true).serve("127.0.0.1", port).await?;
         }
     }
 

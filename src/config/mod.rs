@@ -8,7 +8,7 @@ pub use project_config::ProjectConfig;
 
 /// Default configuration values
 pub const DEFAULT_SCAN_INTERVAL: u64 = 30;
-pub const DEFAULT_PORT: u16 = 8080;
+pub const DEFAULT_PORT: u16 = 8000;
 pub const DEFAULT_HOST: &str = "127.0.0.1";
 pub const DEFAULT_THEME: &str = "auto";
 

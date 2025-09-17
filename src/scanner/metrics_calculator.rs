@@ -130,7 +130,7 @@ impl MetricsCalculator {
     /// Calculate cognitive complexity
     fn calculate_cognitive_complexity(&self, content: &str) -> f64 {
         let mut complexity = 0.0;
-        let mut nesting_level = 0;
+        let mut nesting_level: i32 = 0;
         
         for line in content.lines() {
             let trimmed = line.trim();

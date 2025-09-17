@@ -1,7 +1,25 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use anyhow::{Result, Context};
-use crate::types::{Theme, LayoutType};
+
+/// Available themes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Theme {
+    Light,
+    Dark,
+    Auto,
+    Custom(String),
+}
+
+/// Layout types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayoutType {
+    Grid,
+    ForceDirected,
+    Hierarchical,
+    Circular,
+    Custom(String),
+}
 
 /// Project configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,7 +129,7 @@ impl Default for ProjectConfig {
                 refresh_interval: 30,
             },
             server: ServerSettings {
-                port: 8080,
+                port: 8000,
                 host: "127.0.0.1".to_string(),
                 cors_origins: vec!["*".to_string()],
                 enable_websocket: true,

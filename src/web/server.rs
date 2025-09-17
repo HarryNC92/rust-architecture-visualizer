@@ -38,17 +38,18 @@ impl WebServer {
     
     /// Start the web server
     pub async fn serve(self, host: &str, port: u16) -> Result<()> {
-        let state = WebState::new(self.visualizer);
-        state.set_watch_mode(self.watch_mode);
+        let watch_mode = self.watch_mode;
+        let mut state = WebState::new(self.visualizer);
+        state.set_watch_mode(watch_mode);
         
-        let app = self.create_router(state);
+        let app = Self::create_router_static(state);
         
         let listener = tokio::net::TcpListener::bind(&format!("{}:{}", host, port)).await?;
         
         info!("🚀 Architecture Visualizer server starting on {}:{}", host, port);
         info!("📊 Open your browser to http://{}:{}", host, port);
         
-        if self.watch_mode {
+        if watch_mode {
             info!("👀 Watch mode enabled - auto-refreshing on file changes");
         }
         
@@ -58,7 +59,7 @@ impl WebServer {
     }
     
     /// Create the router with all routes
-    fn create_router(&self, state: WebState) -> Router {
+    fn create_router_static(state: WebState) -> Router {
         Router::new()
             // Main routes
             .route("/", get(handlers::index_handler))

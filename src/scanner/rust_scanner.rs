@@ -15,7 +15,7 @@ use crate::{
 /// Scanner for Rust projects
 pub struct ArchitectureScanner {
     project_path: PathBuf,
-    config: ProjectConfig,
+    pub config: ProjectConfig,
     dependency_analyzer: DependencyAnalyzer,
     metrics_calculator: MetricsCalculator,
 }
@@ -32,7 +32,7 @@ impl ArchitectureScanner {
     }
 
     /// Scan the project and return architecture map
-    pub async fn scan(&self) -> Result<ArchitectureMap> {
+    pub async fn scan_async(&self) -> Result<ArchitectureMap> {
         let start_time = std::time::Instant::now();
         
         // Find all Rust files
@@ -40,7 +40,7 @@ impl ArchitectureScanner {
         
         // Parse each file
         let mut nodes = HashMap::new();
-        let mut all_dependencies = Vec::new();
+        let mut all_dependencies: Vec<DependencyEdge> = Vec::new();
         
         for file_path in &rust_files {
             if let Ok(node) = self.parse_rust_file(file_path).await {
@@ -434,15 +434,15 @@ impl ArchitectureScanner {
     }
 }
 
+#[async_trait::async_trait]
 impl ProjectScanner for ArchitectureScanner {
-    fn scan(&self) -> Result<ArchitectureMap> {
-        // This is a sync wrapper around the async scan method
-        tokio::runtime::Runtime::new()?.block_on(self.scan())
+    async fn scan(&self) -> Result<ArchitectureMap> {
+        self.scan_async().await
     }
 
-    fn scan_incremental(&self, last_scan: Option<ArchitectureMap>) -> Result<ArchitectureMap> {
+    async fn scan_incremental(&self, last_scan: Option<ArchitectureMap>) -> Result<ArchitectureMap> {
         // For now, just do a full scan
         // TODO: Implement incremental scanning
-        self.scan()
+        self.scan_async().await
     }
 }

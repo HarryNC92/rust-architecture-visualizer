@@ -28,13 +28,13 @@ impl ArchitectureVisualizer {
         if let Some(ref cached) = self.cached_architecture {
             Ok(cached.clone())
         } else {
-            self.scanner.scan().await
+            self.scanner.scan_async().await
         }
     }
 
     /// Refresh the architecture data
     pub async fn refresh(&mut self) -> Result<ArchitectureMap> {
-        let architecture = self.scanner.scan().await?;
+        let architecture = self.scanner.scan_async().await?;
         self.cached_architecture = Some(architecture.clone());
         Ok(architecture)
     }
@@ -592,13 +592,13 @@ impl ArchitectureVisualizer {
             <svg class="dependency-arrow" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;">
                 <defs>
                     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                        <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d" />
+                        <polygon points="0 0, 10 3.5, 0 7" fill="{}" />
                     </marker>
                 </defs>
                 {}
             </svg>
             "#,
-            svg_lines.join("")
+            "#6c757d", svg_lines.join("")
         )
     }
 
@@ -714,6 +714,6 @@ impl ArchitectureVisualizer {
                 // TODO: Implement auto-refresh
             }, 30000);
         }
-        "#
+        "#.to_string()
     }
 }

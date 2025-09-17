@@ -10,9 +10,10 @@ use crate::config::ProjectConfig;
 pub use rust_scanner::ArchitectureScanner;
 
 /// Trait for different types of project scanners
+#[async_trait::async_trait]
 pub trait ProjectScanner {
-    fn scan(&self) -> Result<ArchitectureMap>;
-    fn scan_incremental(&self, last_scan: Option<ArchitectureMap>) -> Result<ArchitectureMap>;
+    async fn scan(&self) -> Result<ArchitectureMap>;
+    async fn scan_incremental(&self, last_scan: Option<ArchitectureMap>) -> Result<ArchitectureMap>;
 }
 
 /// Create a scanner for a specific project type

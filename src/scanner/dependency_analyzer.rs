@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::types::{ArchitectureNode, DependencyEdge, DependencyType};
+use crate::types::{ArchitectureNode, DependencyEdge, DependencyType, ModuleType};
 
 /// Analyzes dependencies between modules
 pub struct DependencyAnalyzer {
@@ -42,11 +42,11 @@ impl DependencyAnalyzer {
     }
 
     /// Find a node by its name
-    fn find_node_by_name(
+    fn find_node_by_name<'a>(
         &self,
-        nodes: &HashMap<String, ArchitectureNode>,
+        nodes: &'a HashMap<String, ArchitectureNode>,
         name: &str,
-    ) -> Option<&ArchitectureNode> {
+    ) -> Option<&'a ArchitectureNode> {
         nodes.values().find(|node| node.name == name)
     }
 

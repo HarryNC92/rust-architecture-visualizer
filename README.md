@@ -26,7 +26,7 @@ A beautiful, real-time architecture visualizer for Rust projects that automatica
 cargo install rust-architecture-visualizer
 
 # From source
-git clone https://github.com/yourusername/rust-architecture-visualizer
+git clone https://github.com/harrync/rust-architecture-visualizer
 cd rust-architecture-visualizer
 cargo build --release
 ```
@@ -38,15 +38,18 @@ cargo build --release
 rust-arch-viz scan .
 
 # Start web server
-rust-arch-viz serve --port 8080
+rust-arch-viz serve --port 8000
 
 # Watch mode with auto-refresh
 rust-arch-viz watch --project ./my-rust-project
+
+# current project:
+cargo run -- watch --project /Users/harrync/repos/titan-agent-backend
 ```
 
 ### Web Interface
 
-Open your browser to `http://localhost:8080` to see your architecture visualization!
+Open your browser to `http://localhost:8000` to see your architecture visualization!
 
 ## 📖 Documentation
 
@@ -85,7 +88,7 @@ group_by_type = true
 show_dependencies = true
 
 [server]
-port = 8080
+port = 8000
 host = "127.0.0.1"
 ```
 
