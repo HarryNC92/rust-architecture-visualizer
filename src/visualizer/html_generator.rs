@@ -55,7 +55,7 @@ impl ArchitectureVisualizer {
             .unwrap_or("Rust Project");
 
         let javascript = self.generate_javascript(architecture, settings)?;
-        
+
         Ok(format!(
             r#"
 <!DOCTYPE html>
@@ -217,7 +217,7 @@ body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
             .values()
             .filter(|n| matches!(n.status, NodeStatus::Active))
             .count();
-        
+
         format!(
             r#"
             <div class="stat-card">
@@ -432,8 +432,14 @@ if (!globalObj.ReactDOM) {
 
 // Global data - ensure it's always defined
 const architectureData = __ARCHITECTURE_DATA__ || {};
-const nodesData = architectureData.nodes || [];
-const edgesData = (architectureData.settings && architectureData.settings.showDependencies) ? (architectureData.edges || []) : [];
+const nodesData = Array.isArray(architectureData.nodes)
+    ? architectureData.nodes
+    : Object.values(architectureData.nodes || {});
+const shouldShowDependencies = architectureData?.settings?.showDependencies !== false;
+const rawEdges = Array.isArray(architectureData.edges)
+    ? architectureData.edges
+    : Object.values(architectureData.edges || {});
+const edgesData = shouldShowDependencies ? rawEdges : [];
 const nodeLookup = new Map(nodesData.map((node, index) => [node.id, { ...node, order: node.order ?? index }]));
 
 const layouts = ['grid', 'circular'];
@@ -479,14 +485,29 @@ const buildNodes = (layout, nodes) => {
     }));
 };
 
-const buildEdges = (edges) => edges.map((edge) => ({
-    ...edge,
-    style: { ...(edge.style || {}) },
-    labelStyle: { fill: '#1f2937', fontSize: 11, fontWeight: 600 },
-    labelBgPadding: [6, 3],
-    labelBgBorderRadius: 6,
-    labelBgStyle: { fill: 'rgba(255,255,255,0.9)' }
-}));
+const buildEdges = (edges) => edges
+    .map((edge, index) => {
+        const source = edge?.source ?? edge?.from;
+        const target = edge?.target ?? edge?.to;
+
+        if (!source || !target) {
+            console.warn('[Flow] Skipping edge with missing endpoint', edge);
+            return null;
+        }
+
+        return {
+            ...edge,
+            id: edge?.id ?? `edge-${source}-${target}-${index}`,
+            source,
+            target,
+            style: { ...(edge.style || {}) },
+            labelStyle: { fill: '#1f2937', fontSize: 11, fontWeight: 600 },
+            labelBgPadding: [6, 3],
+            labelBgBorderRadius: 6,
+            labelBgStyle: { fill: 'rgba(255,255,255,0.9)' }
+        };
+    })
+    .filter(Boolean);
 
 // React components
 const e = React.createElement;
