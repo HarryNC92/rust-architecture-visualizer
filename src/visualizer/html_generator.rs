@@ -174,7 +174,7 @@ body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
 .react-flow__node-module{width:210px;border-radius:16px;border:2px solid rgba(102,126,234,.25);background:#fff;box-shadow:0 10px 22px rgba(15,23,42,.12);transition:transform .2s ease,opacity .2s ease;}
 .react-flow__node-module.is-selected{transform:translateY(-3px);border-color:#667eea;}
 .react-flow__node-module.is-dimmed{opacity:.35;}
-.rf-module-card{padding:.9rem 1rem;display:flex;flex-direction:column;gap:.75rem;}
+.rf-module-card{position:relative;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.75rem;}
 .rf-module-card__header{display:flex;align-items:center;gap:.65rem;border-bottom:1px solid rgba(15,23,42,.1);padding-bottom:.4rem;}
 .rf-module-card__icon{font-size:1.45rem;}
 .rf-module-card__name{font-weight:600;font-size:1rem;color:#1f2937;}
@@ -479,7 +479,10 @@ const buildNodes = (layout, nodes) => {
         type: 'module',
         position: positions.get(node.id) || { x: 0, y: 0 },
         data: { ...node },
-        className: ''
+        className: '',
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        draggable: true
     }));
 };
 
@@ -513,8 +516,20 @@ const e = React.createElement;
 const ModuleNode = ({ data }) => {
     const metrics = data?.metrics || {};
     const showMetrics = architectureData?.settings?.showMetrics === true;
-    
+    const accentColor = data?.color || '#4b5563';
+    const handleStyle = {
+        width: 12,
+        height: 12,
+        borderRadius: '50%',
+        background: accentColor,
+        border: '2px solid #fff',
+        boxShadow: '0 0 0 2px rgba(148, 163, 184, 0.25)',
+        zIndex: 10
+    };
+
     return e('div', { className: 'rf-module-card' },
+        e(Handle, { type: 'target', position: Position.Left, style: handleStyle, isConnectable: false }),
+        e(Handle, { type: 'source', position: Position.Right, style: handleStyle, isConnectable: false }),
         e('div', { className: 'rf-module-card__header' },
             e('div', { className: 'rf-module-card__icon' }, data?.icon || ''),
             e('div', null,
