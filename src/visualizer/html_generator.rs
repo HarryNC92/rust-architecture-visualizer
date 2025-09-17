@@ -417,9 +417,18 @@ body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
         let data = self.build_react_flow_data(architecture, settings);
         let serialized = serde_json::to_string(&data)?;
         let template = r#"
-import React from 'https://esm.sh/react@18.2.0';
-import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-import ReactFlow, { Background, Controls, MiniMap, MarkerType, ReactFlowProvider } from 'https://esm.sh/reactflow@11.7.4';
+import * as React from 'https://esm.sh/react@18.2.0?dev';
+import * as ReactDOMClient from 'https://esm.sh/react-dom@18.2.0/client?dev';
+import ReactFlow, { Background, Controls, MiniMap, MarkerType, ReactFlowProvider, applyEdgeChanges, applyNodeChanges } from 'https://esm.sh/reactflow@11.7.4?deps=react@18.2.0,react-dom@18.2.0&dev';
+
+const { createRoot } = ReactDOMClient;
+const globalObj = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : {});
+if (!globalObj.React) {
+    globalObj.React = React;
+}
+if (!globalObj.ReactDOM) {
+    globalObj.ReactDOM = ReactDOMClient;
+}
 
 // Global data - ensure it's always defined
 const architectureData = __ARCHITECTURE_DATA__ || {};
@@ -516,17 +525,28 @@ const ModuleNode = ({ data }) => {
 };
 
 const FlowApp = () => {
-    const [nodes, setNodes] = React.useState([]);
-    const [edges, setEdges] = React.useState([]);
+    const [layout, setLayout] = React.useState(layouts[currentLayoutIndex] || 'grid');
+    const [nodes, setNodes] = React.useState(() =>
+        nodesData.length ? buildNodes(layouts[currentLayoutIndex] || 'grid', nodesData) : []
+    );
+    const [edges, setEdges] = React.useState(() =>
+        edgesData.length ? buildEdges(edgesData) : []
+    );
+    const nodeTypes = React.useMemo(() => ({ module: ModuleNode }), []);
 
-    // Initialize nodes and edges when component mounts
     React.useEffect(() => {
-        if (nodesData.length > 0) {
-            setNodes(buildNodes(layouts[currentLayoutIndex], nodesData));
-        }
-        if (edgesData.length > 0) {
-            setEdges(buildEdges(edgesData));
-        }
+        setNodes(nodesData.length ? buildNodes(layout, nodesData) : []);
+    }, [layout]);
+
+    React.useEffect(() => {
+        const handler = (event) => {
+            const nextLayout = (event?.detail || '').toString().toLowerCase();
+            if (nextLayout && layouts.includes(nextLayout)) {
+                setLayout(nextLayout);
+            }
+        };
+        window.addEventListener('layoutChange', handler);
+        return () => window.removeEventListener('layoutChange', handler);
     }, []);
 
     const onNodeClick = React.useCallback((_, node) => {
@@ -578,35 +598,15 @@ const FlowApp = () => {
         if (detailsContent) detailsContent.innerHTML = '<p class="details-placeholder">Click on a module to see details</p>';
     }, []);
 
-    const onNodesChange = React.useCallback((changes) => {
-        setNodes((nds) => {
-            const newNodes = [...nds];
-            changes.forEach((change) => {
-                if (change.type === 'position' && change.position) {
-                    const node = newNodes.find((n) => n.id === change.id);
-                    if (node) {
-                        node.position = change.position;
-                    }
-                }
-            });
-            return newNodes;
-        });
-    }, []);
+    const onNodesChange = React.useCallback(
+        (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+        []
+    );
 
-    const onEdgesChange = React.useCallback((changes) => {
-        setEdges((eds) => {
-            const newEdges = [...eds];
-            changes.forEach((change) => {
-                if (change.type === 'remove') {
-                    const index = newEdges.findIndex((e) => e.id === change.id);
-                    if (index >= 0) {
-                        newEdges.splice(index, 1);
-                    }
-                }
-            });
-            return newEdges;
-        });
-    }, []);
+    const onEdgesChange = React.useCallback(
+        (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+        []
+    );
 
     if (!nodesData.length) {
         return e('div', { className: 'empty-architecture' }, 'No modules found');
@@ -615,7 +615,7 @@ const FlowApp = () => {
     return e(ReactFlow, {
         nodes,
         edges,
-        nodeTypes: { module: ModuleNode },
+        nodeTypes,
         onNodesChange,
         onEdgesChange,
         onNodeClick,
