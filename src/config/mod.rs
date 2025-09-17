@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use anyhow::{Result, Context};
+use anyhow::Result;
 
 pub mod project_config;
 

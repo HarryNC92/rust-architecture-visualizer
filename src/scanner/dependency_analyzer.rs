@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use crate::types::{ArchitectureNode, DependencyEdge, DependencyType, ModuleType};
 
 /// Analyzes dependencies between modules

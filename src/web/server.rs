@@ -2,7 +2,6 @@ use anyhow::Result;
 use axum::{
     routing::{get, post},
     Router,
-    middleware,
 };
 use tower::ServiceBuilder;
 use tower_http::{

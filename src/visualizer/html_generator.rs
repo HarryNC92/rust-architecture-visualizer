@@ -1,7 +1,7 @@
 use crate::{
     config::ProjectConfig,
     scanner::ArchitectureScanner,
-    types::{ArchitectureMap, LayoutType, ModuleType, NodeStatus, Theme, VisualizationSettings},
+    types::{ArchitectureMap, ModuleType, NodeStatus, Theme, VisualizationSettings},
 };
 use anyhow::Result;
 use serde_json::{json, Value};
@@ -55,7 +55,7 @@ impl ArchitectureVisualizer {
             .unwrap_or("Rust Project");
 
         let javascript = self.generate_javascript(architecture, settings)?;
-
+        
         Ok(format!(
             r#"
 <!DOCTYPE html>
@@ -91,7 +91,7 @@ impl ArchitectureVisualizer {
                 <div class="legend">
                     {}
                 </div>
-                <div class="architecture-canvas" id="architecture-canvas">
+                <div class="architecture-canvas" id="react-flow-root">
                     {}
                 </div>
             </div>
@@ -115,13 +115,13 @@ impl ArchitectureVisualizer {
             </div>
         </div>
     </div>
-
+    
     <script type="module">
         {}
     </script>
 </body>
 </html>
-            "#,
+        "#,
             project_name,
             self.generate_css(settings),
             self.generate_stats_html(architecture),
@@ -217,7 +217,7 @@ body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
             .values()
             .filter(|n| matches!(n.status, NodeStatus::Active))
             .count();
-
+        
         format!(
             r#"
             <div class="stat-card">
@@ -419,37 +419,36 @@ body.theme-dark .stat-card{background:rgba(30,41,59,.92);color:#e2e8f0;}
         let template = r#"
 import React from 'https://esm.sh/react@18.2.0';
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider } from 'https://esm.sh/reactflow@11.7.4';
+import ReactFlow, { Background, Controls, MiniMap, MarkerType, ReactFlowProvider } from 'https://esm.sh/reactflow@11.7.4';
 
-const architectureData = __ARCHITECTURE_DATA__;
+// Global data - ensure it's always defined
+const architectureData = __ARCHITECTURE_DATA__ || {};
 const nodesData = architectureData.nodes || [];
-const edgesData = architectureData.settings.showDependencies ? architectureData.edges : [];
+const edgesData = (architectureData.settings && architectureData.settings.showDependencies) ? (architectureData.edges || []) : [];
 const nodeLookup = new Map(nodesData.map((node, index) => [node.id, { ...node, order: node.order ?? index }]));
 
 const layouts = ['grid', 'circular'];
-let layoutIndex = Math.max(layouts.indexOf((architectureData.layout || 'grid').toLowerCase()), 0);
+let currentLayoutIndex = Math.max(layouts.indexOf((architectureData.layout || 'grid').toLowerCase()), 0);
 
-const detailsPanel = document.getElementById('details-panel');
-const detailsContent = document.getElementById('details-content');
-
+// Utility functions
 const escapeHtml = (value) => value === null || value === undefined ? '' : String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const formatNumber = (value, digits = 0) => value === null || value === undefined ? '—' : Number(value).toLocaleString(undefined, { maximumFractionDigits: digits });
 
-const computePositions = (layout) => {
+const computePositions = (layout, nodes) => {
     const positions = new Map();
-    const total = nodesData.length || 1;
+    const total = nodes.length || 1;
     if (layout === 'circular' && total > 1) {
         const radius = 220 + total * 12;
         const cx = radius + 180;
         const cy = radius * 0.55 + 150;
-        nodesData.forEach((node, index) => {
+        nodes.forEach((node, index) => {
             const angle = (Math.PI * 2 * index) / total;
             positions.set(node.id, { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius * 0.7 });
         });
     }
     if (!positions.size) {
         const columns = Math.ceil(Math.sqrt(total));
-        nodesData.forEach((node, index) => {
+        nodes.forEach((node, index) => {
             const column = index % columns;
             const row = Math.floor(index / columns);
             positions.set(node.id, { x: 160 + column * 240, y: 140 + row * 200 });
@@ -458,9 +457,9 @@ const computePositions = (layout) => {
     return positions;
 };
 
-const buildNodes = (layout) => {
-    const positions = computePositions(layout);
-    return nodesData.map((node) => ({
+const buildNodes = (layout, nodes) => {
+    const positions = computePositions(layout, nodes);
+    return nodes.map((node) => ({
         id: node.id,
         type: 'module',
         position: positions.get(node.id) || { x: 0, y: 0 },
@@ -471,7 +470,7 @@ const buildNodes = (layout) => {
     }));
 };
 
-const buildEdges = () => edgesData.map((edge) => ({
+const buildEdges = (edges) => edges.map((edge) => ({
     ...edge,
     style: { ...(edge.style || {}) },
     labelStyle: { fill: '#1f2937', fontSize: 11, fontWeight: 600 },
@@ -480,100 +479,22 @@ const buildEdges = () => edgesData.map((edge) => ({
     labelBgStyle: { fill: 'rgba(255,255,255,0.9)' }
 }));
 
-const renderDetails = (moduleId) => {
-    if (!detailsPanel || !detailsContent) return;
-    const data = nodeLookup.get(moduleId);
-    if (!data) return;
-    const metrics = data.metrics || {};
-    detailsPanel.classList.add('open');
-    detailsContent.innerHTML = `
-        <div class="details-heading">
-            <div class="details-icon">${escapeHtml(data.icon)}</div>
-            <div class="details-title">
-                <h3>${escapeHtml(data.name)}</h3>
-                <div class="details-meta">${escapeHtml(data.moduleType)} · ${escapeHtml(data.status)}</div>
-            </div>
-        </div>
-        <div class="details-section">
-            <h4>Summary</h4>
-            <p class="details-path">${escapeHtml(data.filePath)}</p>
-        </div>
-        <div class="details-section">
-            <h4>Metrics</h4>
-            <div class="metric-grid">
-                <div class="metric-item"><span class="metric-item__label">Lines</span><span class="metric-item__value">${formatNumber(metrics.lines_of_code)}</span></div>
-                <div class="metric-item"><span class="metric-item__label">Functions</span><span class="metric-item__value">${formatNumber(metrics.function_count)}</span></div>
-                <div class="metric-item"><span class="metric-item__label">Complexity</span><span class="metric-item__value">${formatNumber(metrics.complexity_score,1)}</span></div>
-                <div class="metric-item"><span class="metric-item__label">Deps</span><span class="metric-item__value">${formatNumber(metrics.dependency_count)}</span></div>
-            </div>
-        </div>
-        <div class="details-section">
-            <h4>Dependencies</h4>
-            <div class="chip-row">${(data.dependencies || []).map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') || '<span class="empty-state">None</span>'}</div>
-        </div>
-        <div class="details-section">
-            <h4>Dependents</h4>
-            <div class="chip-row">${(data.dependents || []).map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') || '<span class="empty-state">None</span>'}</div>
-        </div>
-    `;
-};
-
-const hideDetails = () => {
-    if (detailsPanel) detailsPanel.classList.remove('open');
-    if (detailsContent) detailsContent.innerHTML = '<p class="details-placeholder">Click on a module to see details</p>';
-};
-
-const layoutButton = document.getElementById('layout-btn');
-if (layoutButton) {
-    const updateLabel = () => {
-        const name = layouts[layoutIndex];
-        layoutButton.textContent = `📐 Layout (${name.charAt(0).toUpperCase() + name.slice(1)})`;
-    };
-    updateLabel();
-    layoutButton.addEventListener('click', () => {
-        layoutIndex = (layoutIndex + 1) % layouts.length;
-        updateLabel();
-        if (window.applyLayout) window.applyLayout(layouts[layoutIndex]);
-    });
-}
-
-const themeButton = document.getElementById('theme-btn');
-if ((architectureData.settings.theme || '').toLowerCase() === 'dark') {
-    document.body.classList.add('theme-dark');
-}
-if (themeButton) {
-    themeButton.addEventListener('click', () => {
-        document.body.classList.toggle('theme-dark');
-    });
-}
-
-const refreshButton = document.getElementById('refresh-btn');
-if (refreshButton) {
-    refreshButton.addEventListener('click', () => window.location.reload());
-}
-
-const closeButton = document.getElementById('close-details');
-if (closeButton) closeButton.addEventListener('click', hideDetails);
-
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') hideDetails();
-});
-
-hideDetails();
-
+// React components
 const e = React.createElement;
 
 const ModuleNode = ({ data }) => {
-    const metrics = data.metrics || {};
+    const metrics = data?.metrics || {};
+    const showMetrics = architectureData?.settings?.showMetrics === true;
+    
     return e('div', { className: 'rf-module-card' },
         e('div', { className: 'rf-module-card__header' },
-            e('div', { className: 'rf-module-card__icon' }, data.icon),
+            e('div', { className: 'rf-module-card__icon' }, data?.icon || ''),
             e('div', null,
-                e('div', { className: 'rf-module-card__name' }, data.name),
-                e('div', { className: 'rf-module-card__type' }, data.moduleType)
+                e('div', { className: 'rf-module-card__name' }, data?.name || ''),
+                e('div', { className: 'rf-module-card__type' }, data?.moduleType || '')
             )
         ),
-        architectureData.settings.showMetrics ? e('div', { className: 'rf-module-card__metrics' },
+        showMetrics ? e('div', { className: 'rf-module-card__metrics' },
             e('div', { className: 'rf-metric' },
                 e('div', { className: 'rf-metric__value' }, formatNumber(metrics.lines_of_code)),
                 e('div', { className: 'rf-metric__label' }, 'Lines')
@@ -595,23 +516,96 @@ const ModuleNode = ({ data }) => {
 };
 
 const FlowApp = () => {
-    const [nodes, setNodes, onNodesChange] = useNodesState(buildNodes(layouts[layoutIndex]));
-    const [edges, setEdges, onEdgesChange] = useEdgesState(buildEdges());
+    const [nodes, setNodes] = React.useState([]);
+    const [edges, setEdges] = React.useState([]);
 
+    // Initialize nodes and edges when component mounts
     React.useEffect(() => {
-        window.applyLayout = (layout) => {
-            const positions = computePositions(layout);
-            setNodes((current) => current.map((node) => ({ ...node, position: positions.get(node.id) || node.position })));
-        };
-        return () => { delete window.applyLayout; };
-    }, [setNodes]);
+        if (nodesData.length > 0) {
+            setNodes(buildNodes(layouts[currentLayoutIndex], nodesData));
+        }
+        if (edgesData.length > 0) {
+            setEdges(buildEdges(edgesData));
+        }
+    }, []);
 
     const onNodeClick = React.useCallback((_, node) => {
-        renderDetails(node.id);
+        const detailsPanel = document.getElementById('details-panel');
+        const detailsContent = document.getElementById('details-content');
+        if (!detailsPanel || !detailsContent) return;
+        
+        const data = nodeLookup.get(node.id);
+        if (!data) return;
+        
+        const metrics = data.metrics || {};
+        detailsPanel.classList.add('open');
+        detailsContent.innerHTML = `
+            <div class="details-heading">
+                <div class="details-icon">${escapeHtml(data.icon)}</div>
+                <div class="details-title">
+                    <h3>${escapeHtml(data.name)}</h3>
+                    <div class="details-meta">${escapeHtml(data.moduleType)} · ${escapeHtml(data.status)}</div>
+                </div>
+            </div>
+            <div class="details-section">
+                <h4>Summary</h4>
+                <p class="details-path">${escapeHtml(data.filePath)}</p>
+            </div>
+            <div class="details-section">
+                <h4>Metrics</h4>
+                <div class="metric-grid">
+                    <div class="metric-item"><span class="metric-item__label">Lines</span><span class="metric-item__value">${formatNumber(metrics.lines_of_code)}</span></div>
+                    <div class="metric-item"><span class="metric-item__label">Functions</span><span class="metric-item__value">${formatNumber(metrics.function_count)}</span></div>
+                    <div class="metric-item"><span class="metric-item__label">Complexity</span><span class="metric-item__value">${formatNumber(metrics.complexity_score,1)}</span></div>
+                    <div class="metric-item"><span class="metric-item__label">Deps</span><span class="metric-item__value">${formatNumber(metrics.dependency_count)}</span></div>
+                </div>
+            </div>
+            <div class="details-section">
+                <h4>Dependencies</h4>
+                <div class="chip-row">${(data.dependencies || []).map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') || '<span class="empty-state">None</span>'}</div>
+            </div>
+            <div class="details-section">
+                <h4>Dependents</h4>
+                <div class="chip-row">${(data.dependents || []).map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') || '<span class="empty-state">None</span>'}</div>
+            </div>
+        `;
     }, []);
 
     const onPaneClick = React.useCallback(() => {
-        hideDetails();
+        const detailsPanel = document.getElementById('details-panel');
+        const detailsContent = document.getElementById('details-content');
+        if (detailsPanel) detailsPanel.classList.remove('open');
+        if (detailsContent) detailsContent.innerHTML = '<p class="details-placeholder">Click on a module to see details</p>';
+    }, []);
+
+    const onNodesChange = React.useCallback((changes) => {
+        setNodes((nds) => {
+            const newNodes = [...nds];
+            changes.forEach((change) => {
+                if (change.type === 'position' && change.position) {
+                    const node = newNodes.find((n) => n.id === change.id);
+                    if (node) {
+                        node.position = change.position;
+                    }
+                }
+            });
+            return newNodes;
+        });
+    }, []);
+
+    const onEdgesChange = React.useCallback((changes) => {
+        setEdges((eds) => {
+            const newEdges = [...eds];
+            changes.forEach((change) => {
+                if (change.type === 'remove') {
+                    const index = newEdges.findIndex((e) => e.id === change.id);
+                    if (index >= 0) {
+                        newEdges.splice(index, 1);
+                    }
+                }
+            });
+            return newEdges;
+        });
     }, []);
 
     if (!nodesData.length) {
@@ -638,11 +632,68 @@ const FlowApp = () => {
     );
 };
 
-const rootElement = document.getElementById('react-flow-root');
-if (rootElement) {
-    const root = createRoot(rootElement);
-    root.render(e(ReactFlowProvider, null, e(FlowApp, null)));
-}
+// Initialize the app when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Setup non-React event handlers
+    const themeButton = document.getElementById('theme-btn');
+    if ((architectureData?.settings?.theme || '').toLowerCase() === 'dark') {
+        document.body.classList.add('theme-dark');
+    }
+    if (themeButton) {
+        themeButton.addEventListener('click', () => {
+            document.body.classList.toggle('theme-dark');
+        });
+    }
+
+    const refreshButton = document.getElementById('refresh-btn');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => window.location.reload());
+    }
+
+    const closeButton = document.getElementById('close-details');
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            const detailsPanel = document.getElementById('details-panel');
+            const detailsContent = document.getElementById('details-content');
+            if (detailsPanel) detailsPanel.classList.remove('open');
+            if (detailsContent) detailsContent.innerHTML = '<p class="details-placeholder">Click on a module to see details</p>';
+        });
+    }
+
+    // Layout button handler
+    const layoutButton = document.getElementById('layout-btn');
+    if (layoutButton) {
+        const updateLabel = () => {
+            const name = layouts[currentLayoutIndex];
+            layoutButton.textContent = `📐 Layout (${name.charAt(0).toUpperCase() + name.slice(1)})`;
+        };
+        updateLabel();
+        layoutButton.addEventListener('click', () => {
+            currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length;
+            updateLabel();
+            // Trigger a re-render by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('layoutChange', { detail: layouts[currentLayoutIndex] }));
+        });
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            const detailsPanel = document.getElementById('details-panel');
+            const detailsContent = document.getElementById('details-content');
+            if (detailsPanel) detailsPanel.classList.remove('open');
+            if (detailsContent) detailsContent.innerHTML = '<p class="details-placeholder">Click on a module to see details</p>';
+        }
+    });
+
+    // Initialize React app
+    const rootElement = document.getElementById('react-flow-root');
+    if (rootElement) {
+        const root = createRoot(rootElement);
+        root.render(e(ReactFlowProvider, null, e(FlowApp, null)));
+    } else {
+        console.error('React Flow root element not found');
+    }
+});
 "#;
         Ok(template.replace("__ARCHITECTURE_DATA__", &serialized))
     }

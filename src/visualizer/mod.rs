@@ -4,7 +4,6 @@ pub mod svg_renderer;
 use anyhow::Result;
 use std::path::Path;
 use crate::{
-    types::ArchitectureMap,
     config::ProjectConfig,
     scanner::ArchitectureScanner,
 };

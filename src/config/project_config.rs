@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 /// Available themes

@@ -4,12 +4,10 @@ use axum::{
     response::{Html, Json},
 };
 use serde_json::json;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::{
     web::WebState,
-    types::{ArchitectureMap, VisualizationSettings},
+    types::ArchitectureMap,
 };
 
 /// Main index page handler

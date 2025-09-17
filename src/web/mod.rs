@@ -2,7 +2,6 @@ pub mod server;
 pub mod handlers;
 pub mod websocket;
 
-use axum::Router;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::visualizer::ArchitectureVisualizer;

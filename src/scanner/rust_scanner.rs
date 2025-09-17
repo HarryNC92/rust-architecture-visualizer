@@ -1,6 +1,6 @@
 use anyhow::{Result, Context};
 use std::path::{Path, PathBuf};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use walkdir::WalkDir;
 use regex::Regex;
 use chrono::{DateTime, Utc};
@@ -40,7 +40,7 @@ impl ArchitectureScanner {
         
         // Parse each file
         let mut nodes = HashMap::new();
-        let mut all_dependencies: Vec<DependencyEdge> = Vec::new();
+        let all_dependencies: Vec<DependencyEdge> = Vec::new();
         
         for file_path in &rust_files {
             if let Ok(node) = self.parse_rust_file(file_path).await {

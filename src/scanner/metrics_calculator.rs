@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::collections::HashMap;
 use crate::types::{ArchitectureNode, DependencyEdge, NodeMetrics, ArchitectureMetrics};
 

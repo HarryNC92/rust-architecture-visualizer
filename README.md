@@ -43,8 +43,6 @@ rust-arch-viz serve --port 8000
 # Watch mode with auto-refresh
 rust-arch-viz watch --project ./my-rust-project
 
-# current project:
-cargo run -- watch --project /Users/harrync/repos/titan-agent-backend
 ```
 
 ### Web Interface
@@ -132,4 +130,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Made with ❤️ for the Rust community**
+
 # rust-architecture-visualizer

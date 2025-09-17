@@ -6,7 +6,7 @@ use rust_architecture_visualizer::{
     visualizer::ArchitectureVisualizer,
 };
 use std::path::PathBuf;
-use tracing::{info, error};
+use tracing::info;
 
 #[derive(Parser)]
 #[command(name = "rust-arch-viz")]
